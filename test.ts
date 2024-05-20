@@ -7,9 +7,9 @@ import { tap } from "./command";
   const device = adb.devices.find((d) => d.serialNumber === "emulator-5554");
 
   if (device) {
-    let adCount = 12;
+    let adCount = 1;
     device.on("command_finish", (command) => {
-      if (command.id && command.id === "lastCommand") {
+      if (command.id === "lastCommand") {
         console.log(`flow finish - current count ${adCount}`);
         adCount++;
         if (adCount <= 10) {

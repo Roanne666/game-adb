@@ -11,8 +11,8 @@ export type Rect2 = {
 };
 
 export type Command = {
-  delay: number;
-  id?: string;
+  id: string;
   type: "tap" | "swipe" | "keyevent" | "text";
   args: string[];
+  delay: number;
 };
