@@ -25,7 +25,8 @@ export class Adb {
     this.adbPath = adbPath;
   }
 
-  public async initDevices() {
+  public async initDevices(retry = 3) {
+    if (retry === 0) throw "Adb get devices failed";
     const devicesStdout = await issueShellCommand(this.adbPath, ["devices"]);
     const deviceInfoArray = devicesStdout.trim().split("\r\n");
     let regAttached = false;
@@ -37,6 +38,9 @@ export class Adb {
       } else if (info === "List of devices attached") {
         regAttached = true;
       }
+    }
+    if (regAttached === false) {
+      await this.initDevices(retry - 1);
     }
   }
 }

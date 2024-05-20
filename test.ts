@@ -2,12 +2,12 @@ import { createAdb } from "./adb";
 import { tap } from "./command";
 
 (async () => {
-  const adb = await createAdb("C:\\leidian\\LDPlayer9");
+  const adb = await createAdb("D:\\leidian\\LDPlayer9");
 
   const device = adb.devices.find((d) => d.serialNumber === "emulator-5554");
 
   if (device) {
-    let adCount = 1;
+    let adCount = 0;
     device.on("command_finish", (command) => {
       if (command.id === "lastCommand") {
         console.log(`flow finish - current count ${adCount}`);
@@ -27,7 +27,7 @@ import { tap } from "./command";
       }
     });
 
-    const enterFirstAd = tap({ x: 789, y: 225, width: 212, height: 75 }, { delay: 1000 * 30 });
+    const enterFirstAd = tap({ x: 789, y: 225, width: 212, height: 75 }, { delay: 1000 * 35 });
     const enterSecondAd = tap({ x: 793, y: 356, width: 212, height: 75 }, { delay: 1000 * 30 });
     const enterThirdAd = tap({ x: 793, y: 489, width: 212, height: 75 }, { delay: 1000 * 30 });
 
