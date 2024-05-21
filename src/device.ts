@@ -163,20 +163,56 @@ export class Device {
     }
   }
 
+  /**
+   * Get resolution of this device
+   * @returns
+   */
   public async getResolution(): Promise<Vector2> {
     const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
     const [width, height] = result.split(":")[1].split("x");
     return { x: Number(width.trim()), y: Number(height.trim()) };
   }
 
-  public async getCurrentActivity() {
+  /**
+   * Check if activity is running top
+   * @param activityName
+   * @returns
+   */
+  public async isCurrentActivity(packageName: string, activityName: string) {
     const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
     const resultLines = result.split("\r\n");
     for (const line of resultLines) {
-      if (line.includes("mCurrentFocus")) {
-        return line;
+      if (line.includes("mCurrentFocus") && line.includes(`${packageName}/${activityName}`)) {
+        return true;
       }
     }
-    return "";
+    return false;
+  }
+
+  /**
+   * Start an app if not at the current focus
+   * @param pakageName
+   * @param activityName
+   */
+  public async startApp(pakageName: string, activityName: string) {
+    const status = await this.isCurrentActivity(pakageName, activityName);
+    if (!status) await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "start", "-n", `${pakageName}/${activityName}`]);
+  }
+
+  /**
+   * Close an app
+   * @param pakageName
+   */
+  public async closeApp(pakageName: string) {
+    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
+  }
+
+  /**
+   * Take a screencap and pull it out
+   * @param options 
+   */
+  public async getScreencap(options?: { fileName?: string; pullPath?: string }) {
+    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "screencap", options?.fileName || "/sdcard/screen.png"]);
+    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "pull", options?.fileName || "/sdcard/screen.png", options?.pullPath || "./"]);
   }
 }

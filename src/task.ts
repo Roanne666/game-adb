@@ -8,7 +8,7 @@ export class Task {
   public readonly name: String;
   public readonly commands: CommandBase[] = [];
   public readonly next: string[] = [];
-  public readonly handler: () => Promise<boolean> | boolean = () => true;
+  public readonly handler: (device: Device) => Promise<boolean> | boolean = () => true;
 
   public readonly times: number = 1;
   public readonly preDelay: number = 500;
@@ -28,7 +28,7 @@ export class Task {
     await delay(this.preDelay);
 
     let status = false;
-    if (this.handler) status = await this.handler();
+    if (this.handler) status = await this.handler(device);
 
     if (status) {
       for (const command of this.commands) {

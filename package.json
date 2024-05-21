@@ -5,7 +5,8 @@
   "scripts": {
     "test-command": "ts-node ./test/test-command.ts",
     "test-task": "ts-node ./test/test-task.ts",
-    "test-json": "ts-node ./test/test-json.ts"
+    "test-json": "ts-node ./test/test-json.ts",
+    "test-new": "ts-node ./test/test-new.ts"
   },
   "keywords": [
     "adb",
