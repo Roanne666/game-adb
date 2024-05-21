@@ -1,4 +1,4 @@
-import { execFile, spawn } from "child_process";
+import { execFile } from "child_process";
 import type { Rect2, Vector2 } from "./types";
 
 export async function issueShellCommand(adbPath: string, args: string[]) {

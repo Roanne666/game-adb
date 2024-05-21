@@ -1,4 +1,4 @@
-import { createAdb, TapCommand, Task, TaskFlow } from "..";
+import { createAdb, SwipeCommand, TapCommand, Task, TaskFlow } from "..";
 
 (async () => {
   const adb = await createAdb("C:\\leidian\\LDPlayer9");
@@ -19,16 +19,19 @@ import { createAdb, TapCommand, Task, TaskFlow } from "..";
         commands: [
           // open popup
           new TapCommand({ x: 41, y: 640, width: 28, height: 25 }),
-          // click quick make
+          // open quick make
           new TapCommand({ x: 856, y: 94, width: 134, height: 29 }),
+          // swipe ap
+          new SwipeCommand({ x: 519, y: 361 }, { x: 747, y: 368 }),
           // confirm quick make
           new TapCommand({ x: 535, y: 496, width: 102, height: 31 }, { postDelay: 5000 }),
           // confirm reward
-          new TapCommand({ x: 535, y: 496, width: 102, height: 31 }),
+          new TapCommand({ x: 535, y: 496, width: 102, height: 31 }, { postDelay: 1000 }),
           // close popup
           new TapCommand({ x: 1039, y: 87, width: 19, height: 30 }),
         ],
-        next: "save_data",
+        times: 2,
+        next: ["save_data"],
       }),
       new Task({
         name: "save_data",

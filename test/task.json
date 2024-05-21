@@ -4,15 +4,13 @@
     "commands": [
       { "type": "tap", "rect": { "x": 41, "y": 640, "width": 28, "height": 25 } },
       { "type": "tap", "rect": { "x": 856, "y": 94, "width": 134, "height": 29 } },
-      {
-        "type": "tap",
-        "rect": { "x": 535, "y": 496, "width": 102, "height": 31 },
-        "postDelay": 5000
-      },
-      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 } },
+      { "type": "swipe", "originRect": { "x": 519, "y": 361 }, "targetRect": { "x": 747, "y": 368 } },
+      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 }, "postDelay": 5000 },
+      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 }, "postDelay": 1000 },
       { "type": "tap", "rect": { "x": 1039, "y": 87, "width": 19, "height": 30 } }
     ],
-    "next": "save_data"
+    "times": 2,
+    "next": ["save_data"]
   },
   {
     "name": "save_data",

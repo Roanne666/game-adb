@@ -20,8 +20,9 @@ export type CommandOptions = {
 export type TaskOptions = {
   name: string;
   commands: CommandBase[];
+  times?: number;
   preDelay?: number;
   postDelay?: number;
-  next?: string;
+  next?: string[];
   handler?: () => Promise<boolean> | boolean;
 };

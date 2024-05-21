@@ -34,7 +34,7 @@ export class SwipeCommand extends CommandBase {
   public readonly targetPos: Vector2;
   public readonly duration: number;
 
-  constructor(originRect: Rect2, targetRect: Rect2, duration = 300, options?: CommandOptions) {
+  constructor(originRect: Rect2, targetRect: Rect2, duration = 500, options?: CommandOptions) {
     super(options);
     this.originPos = getRandomPosition(originRect);
     this.targetPos = getRandomPosition(targetRect);
