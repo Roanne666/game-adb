@@ -3,7 +3,7 @@ import type { Rect2, Vector2 } from "./types";
 
 export async function issueShellCommand(adbPath: string, args: string[]) {
   const result = await new Promise<string>((resolve) => {
-    execFile("adb", args, { cwd: adbPath }, (error, stdout, stderr) => {
+    execFile(adbPath, args, (error, stdout, stderr) => {
       if (error) throw error;
       resolve(stderr === "" ? stdout : stderr);
     });

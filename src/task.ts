@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { TapCommand, type CommandBase, SwipeCommand } from "./command";
+import { type CommandBase, TapCommand, SwipeCommand } from "./command";
 import type { Device } from "./device";
 import type { Rect2, TaskOptions } from "./types";
 import { delay } from "./utils";
@@ -117,9 +117,7 @@ export function createTaskFlowFromJson(jsonPath: string, device: Device) {
         }
       } else if (type === "swipe") {
         if (c.originRect && c.targetRect) {
-          commands.push(
-            new SwipeCommand(c.originRect, c.targetRect, c.duration, { preDelay: c.preDelay, postDelay: c.postDelay })
-          );
+          commands.push(new SwipeCommand(c.originRect, c.targetRect, c.duration, { preDelay: c.preDelay, postDelay: c.postDelay }));
         }
       } else if (type === "keyevent") {
       } else if (type === "text") {

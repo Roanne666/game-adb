@@ -34,6 +34,7 @@ export class Adb {
       if (regAttached) {
         const [serialNumber, connectStatus] = info.split("\t");
         const newDevice = new Device(this.path, serialNumber, connectStatus === "device" ? true : false);
+        await newDevice.init();
         this._devices.push(newDevice);
       } else if (info === "List of devices attached") {
         regAttached = true;

@@ -13,7 +13,7 @@ export abstract class CommandBase {
     if (options?.postDelay) this.postDelay = options.postDelay;
   }
 
-  public abstract getCommandArgs(): string[];
+  public abstract getCommandArgs(resolutionRatio?: Vector2): string[];
 }
 
 export class TapCommand extends CommandBase {
@@ -24,8 +24,8 @@ export class TapCommand extends CommandBase {
     this.targetPos = getRandomPosition(rect);
   }
 
-  public getCommandArgs() {
-    return ["input", "tap", String(this.targetPos.x), String(this.targetPos.y)];
+  public getCommandArgs(resolutionRatio: Vector2) {
+    return ["input", "tap", String(this.targetPos.x * resolutionRatio.x), String(this.targetPos.y * resolutionRatio.y)];
   }
 }
 
@@ -41,14 +41,14 @@ export class SwipeCommand extends CommandBase {
     this.duration = duration;
   }
 
-  public getCommandArgs() {
+  public getCommandArgs(resolutionRatio: Vector2) {
     return [
       "input",
       "swipe",
-      String(this.originPos.x),
-      String(this.originPos.y),
-      String(this.targetPos.x),
-      String(this.targetPos.y),
+      String(this.originPos.x * resolutionRatio.x),
+      String(this.originPos.y * resolutionRatio.y),
+      String(this.targetPos.x * resolutionRatio.x),
+      String(this.targetPos.y * resolutionRatio.y),
       String(this.duration),
     ];
   }

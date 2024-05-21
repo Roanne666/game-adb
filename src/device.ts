@@ -1,4 +1,5 @@
 import type { CommandBase } from "./command";
+import type { Vector2 } from "./types";
 import { delay, issueShellCommand } from "./utils";
 
 /**
@@ -15,6 +16,20 @@ export class Device {
    * Adb creates a string to uniquely identify the device by its port number. Here's an example serial number: emulator-5554
    */
   public readonly serialNumber: string;
+
+  public readonly resolution: Vector2 = { x: 0, y: 0 };
+
+  private _commandResolution: Vector2 = { x: 1280, y: 720 };
+  public get commandResolution() {
+    return this._commandResolution;
+  }
+  public set commandResolution(value: Vector2) {
+    this._commandResolution = value;
+  }
+
+  private get resolutionRatio(): Vector2 {
+    return { x: this.resolution.x / this.commandResolution.x, y: this.resolution.y / this.commandResolution.y };
+  }
 
   private _connected: boolean;
   /**
@@ -61,6 +76,12 @@ export class Device {
     this._connected = connectStatus;
   }
 
+  public async init() {
+    const resolution = await this.getResolution();
+    this.resolution.x = resolution.x;
+    this.resolution.y = resolution.y;
+  }
+
   /**
    * Issue command by text
    * @param commandText
@@ -81,7 +102,7 @@ export class Device {
     if (this.onCommandStart) this.onCommandStart(command);
 
     await delay(command.preDelay);
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.getCommandArgs()]);
+    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.getCommandArgs(this.resolutionRatio)]);
     await delay(command.postDelay);
 
     if (this.onCommandFinish) this.onCommandFinish(command);
@@ -122,10 +143,7 @@ export class Device {
    * @param eventName
    * @param handler
    */
-  public on(
-    eventName: "command_start" | "command_finish" | "command_delay_finish",
-    handler: (command: CommandBase) => void
-  ) {
+  public on(eventName: "command_start" | "command_finish" | "command_delay_finish", handler: (command: CommandBase) => void) {
     if (eventName === "command_start") {
       this.onCommandStart = handler;
     } else {
@@ -143,6 +161,12 @@ export class Device {
     } else {
       this.onCommandFinish = null;
     }
+  }
+
+  public async getResolution(): Promise<Vector2> {
+    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
+    const [width, height] = result.split(":")[1].split("x");
+    return { x: Number(width.trim()), y: Number(height.trim()) };
   }
 
   public async getCurrentActivity() {

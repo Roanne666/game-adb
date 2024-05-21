@@ -1,15 +1,27 @@
 [
   {
+    "name": "skip_show",
+    "commands": [
+      { "type": "tap", "rect": { "x": 1234, "y": 19, "width": 21, "height": 16 } },
+      { "type": "tap", "rect": { "x": 635, "y": 177, "width": 67, "height": 17 } },
+      { "type": "tap", "rect": { "x": 266, "y": 294, "width": 5, "height": 5 } },
+      { "type": "tap", "rect": { "x": 266, "y": 294, "width": 5, "height": 5 } },
+      { "type": "tap", "rect": { "x": 493, "y": 418, "width": 119, "height": 31 } },
+      { "type": "tap", "rect": { "x": 1034, "y": 159, "width": 16, "height": 27 } }
+    ],
+    "next": ["quick_make"]
+  },
+  {
     "name": "quick_make",
     "commands": [
       { "type": "tap", "rect": { "x": 41, "y": 640, "width": 28, "height": 25 } },
       { "type": "tap", "rect": { "x": 856, "y": 94, "width": 134, "height": 29 } },
       { "type": "swipe", "originRect": { "x": 519, "y": 361 }, "targetRect": { "x": 747, "y": 368 } },
-      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 }, "postDelay": 5000 },
       { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 }, "postDelay": 1000 },
+      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 } },
+      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 } },
       { "type": "tap", "rect": { "x": 1039, "y": 87, "width": 19, "height": 30 } }
     ],
-    "times": 2,
     "next": ["save_data"]
   },
   {
