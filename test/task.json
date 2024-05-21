@@ -1,0 +1,26 @@
+[
+  {
+    "name": "quick_make",
+    "commands": [
+      { "type": "tap", "rect": { "x": 41, "y": 640, "width": 28, "height": 25 } },
+      { "type": "tap", "rect": { "x": 856, "y": 94, "width": 134, "height": 29 } },
+      {
+        "type": "tap",
+        "rect": { "x": 535, "y": 496, "width": 102, "height": 31 },
+        "postDelay": 5000
+      },
+      { "type": "tap", "rect": { "x": 535, "y": 496, "width": 102, "height": 31 } },
+      { "type": "tap", "rect": { "x": 1039, "y": 87, "width": 19, "height": 30 } }
+    ],
+    "next": "save_data"
+  },
+  {
+    "name": "save_data",
+    "commands": [
+      { "type": "tap", "rect": { "x": 1070, "y": 12, "width": 20, "height": 25 } },
+      { "type": "tap", "rect": { "x": 710, "y": 262, "width": 100, "height": 39 } },
+      { "type": "tap", "rect": { "x": 495, "y": 420, "width": 113, "height": 28 } },
+      { "type": "tap", "rect": { "x": 958, "y": 193, "width": 18, "height": 25 } }
+    ]
+  }
+]

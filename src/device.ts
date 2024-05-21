@@ -1,5 +1,5 @@
-import { Command } from "./types";
-import { issueShellCommand } from "./utils";
+import type { CommandBase } from "./command";
+import { delay, issueShellCommand } from "./utils";
 
 /**
  * The Device instance is binding with specific serial number of adb device.
@@ -37,27 +37,23 @@ export class Device {
     return this._running;
   }
 
-  private _commandQueue: Command[] = [];
+  private _commandQueue: CommandBase[] = [];
   /**
    * The command will be added to the commandQueue after using the addCommond function,.
    */
   public get commandQueue() {
-    return [
-      ...this._commandQueue.map<Command>((v) => {
-        return this.getCommandCopy(v);
-      }),
-    ];
+    return [...this._commandQueue];
   }
 
   /**
    * Callback function for command_start trigger
    */
-  private commandStartHandler: ((command: Command) => void) | null = null;
+  private onCommandStart: ((command: CommandBase) => void) | null = null;
 
   /**
    * Callback function for command_finish trigger
    */
-  private commandFinishHandler: ((command: Command) => void) | null = null;
+  private onCommandFinish: ((command: CommandBase) => void) | null = null;
 
   constructor(adbPath: string, serialNumber: string, connectStatus: boolean) {
     this.adbPath = adbPath;
@@ -65,21 +61,33 @@ export class Device {
     this._connected = connectStatus;
   }
 
-  private getCommandCopy(command: Command): Command {
-    return { delay: command.delay, id: command.id, type: command.type, args: [...command.args] };
+  /**
+   * Issue command by text
+   * @param commandText
+   */
+  public async issueCommandText(commandText: string) {
+    this._running = true;
+    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", commandText]);
+    this._running = false;
+    return result;
   }
 
-  public async issueCommand(command: Command) {
+  /**
+   * Issue standard command
+   * @param command
+   */
+  public async issueCommand(command: CommandBase) {
     this._running = true;
-    if (this.commandStartHandler) this.commandStartHandler(this.getCommandCopy(command));
+    if (this.onCommandStart) this.onCommandStart(command);
 
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.args]);
-    await new Promise((resolve) => setTimeout(() => resolve(true), command.delay));
+    await delay(command.preDelay);
+    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.getCommandArgs()]);
+    await delay(command.postDelay);
 
-    if (this.commandFinishHandler) this.commandFinishHandler(this.getCommandCopy(command));
+    if (this.onCommandFinish) this.onCommandFinish(command);
 
     if (this._commandQueue.length > 0 && this.autoRun) {
-      const nextCommand = this._commandQueue.shift() as Command;
+      const nextCommand = this._commandQueue.shift() as CommandBase;
       this.issueCommand(nextCommand);
     } else {
       this._running = false;
@@ -90,7 +98,7 @@ export class Device {
    * Add command to command queue
    * @param command
    */
-  public addCommand(command: Command) {
+  public addCommand(command: CommandBase) {
     if (this.autoRun && !this.running) {
       this.issueCommand(command);
     } else {
@@ -104,7 +112,7 @@ export class Device {
    */
   public async nextCommand() {
     if (this.autoRun || this._running || this._commandQueue.length === 0) return false;
-    const nextCommand = this._commandQueue.shift() as Command;
+    const nextCommand = this._commandQueue.shift() as CommandBase;
     await this.issueCommand(nextCommand);
     return true;
   }
@@ -116,12 +124,12 @@ export class Device {
    */
   public on(
     eventName: "command_start" | "command_finish" | "command_delay_finish",
-    handler: (command: Command) => void
+    handler: (command: CommandBase) => void
   ) {
     if (eventName === "command_start") {
-      this.commandStartHandler = handler;
+      this.onCommandStart = handler;
     } else {
-      this.commandFinishHandler = handler;
+      this.onCommandFinish = handler;
     }
   }
 
@@ -131,9 +139,20 @@ export class Device {
    */
   public off(eventName: "command_start" | "command_finish") {
     if (eventName === "command_start") {
-      this.commandStartHandler = null;
+      this.onCommandStart = null;
     } else {
-      this.commandFinishHandler = null;
+      this.onCommandFinish = null;
     }
+  }
+
+  public async getCurrentActivity() {
+    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
+    const resultLines = result.split("\r\n");
+    for (const line of resultLines) {
+      if (line.includes("mCurrentFocus")) {
+        return line;
+      }
+    }
+    return "";
   }
 }
