@@ -1,4 +1,4 @@
-import { createAdb } from "..";
+import { createAdb } from "../src";
 
 (async () => {
   const adb = await createAdb(process.argv[2]);

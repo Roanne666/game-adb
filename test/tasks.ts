@@ -1,4 +1,4 @@
-import { Task, TapCommand, SwipeCommand, type Device } from "..";
+import { Task, TapCommand, SwipeCommand, type Device } from "../src";
 
 export const quickMakeTask = new Task({
   name: "quick_make",

@@ -1,4 +1,4 @@
-import { createAdb, createTaskFlowFromJson } from "..";
+import { createAdb, createTaskFlowFromJson } from "../src";
 
 (async () => {
   const adb = await createAdb(process.argv[2]);

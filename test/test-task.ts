@@ -1,4 +1,4 @@
-import { createAdb, TaskFlow } from "..";
+import { createAdb, TaskFlow } from "../src";
 import { quickMakeTask, saveDataTask } from "./tasks";
 
 (async () => {
