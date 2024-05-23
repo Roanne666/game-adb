@@ -1,5 +1,6 @@
+import { EventEmitter } from "events";
 import type { CommandBase } from "./command";
-import type { Vector2 } from "./types";
+import { CommandLifeCycle, type Vector2 } from "./types";
 import { delay, issueShellCommand } from "./utils";
 
 /**
@@ -60,15 +61,7 @@ export class Device {
     return [...this._commandQueue];
   }
 
-  /**
-   * Callback function for command_start trigger
-   */
-  private onCommandStart: ((command: CommandBase) => void) | null = null;
-
-  /**
-   * Callback function for command_finish trigger
-   */
-  private onCommandFinish: ((command: CommandBase) => void) | null = null;
+  private readonly _eventEmmiter = new EventEmitter();
 
   constructor(adbPath: string, serialNumber: string, connectStatus: boolean) {
     this.adbPath = adbPath;
@@ -99,13 +92,28 @@ export class Device {
    */
   public async issueCommand(command: CommandBase) {
     this._running = true;
-    if (this.onCommandStart) this.onCommandStart(command);
-
+    this._eventEmmiter.emit(CommandLifeCycle.command_start, command);
     await delay(command.preDelay);
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.getCommandArgs(this.resolutionRatio)]);
+
+    const status = await command.checker(this);
+    if (status) {
+      this._eventEmmiter.emit(CommandLifeCycle.check_pass, command);
+    } else {
+      this._commandQueue.length = 0;
+      this._running = false;
+      this._eventEmmiter.emit(CommandLifeCycle.check_fail, command);
+      return;
+    }
+
+    await issueShellCommand(this.adbPath, [
+      "-s",
+      this.serialNumber,
+      "shell",
+      ...command.getCommandArgs(this.resolutionRatio),
+    ]);
     await delay(command.postDelay);
 
-    if (this.onCommandFinish) this.onCommandFinish(command);
+    this._eventEmmiter.emit(CommandLifeCycle.command_finish, command);
 
     if (this._commandQueue.length > 0 && this.autoRun) {
       const nextCommand = this._commandQueue.shift() as CommandBase;
@@ -139,28 +147,21 @@ export class Device {
   }
 
   /**
-   * Add listener for command_start or command_finish
+   * Add listener to command life cycle event
    * @param eventName
-   * @param handler
+   * @param listener
    */
-  public on(eventName: "command_start" | "command_finish" | "command_delay_finish", handler: (command: CommandBase) => void) {
-    if (eventName === "command_start") {
-      this.onCommandStart = handler;
-    } else {
-      this.onCommandFinish = handler;
-    }
+  public on(eventName: CommandLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmmiter.on(eventName, listener);
   }
 
   /**
-   * Remove Listener for command_start or command_finish
+   * Remove Listener to command life cycle event
    * @param eventName
+   * @param listener
    */
-  public off(eventName: "command_start" | "command_finish") {
-    if (eventName === "command_start") {
-      this.onCommandStart = null;
-    } else {
-      this.onCommandFinish = null;
-    }
+  public off(eventName: CommandLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmmiter.off(eventName, listener);
   }
 
   /**
@@ -196,7 +197,16 @@ export class Device {
    */
   public async startApp(pakageName: string, activityName: string) {
     const status = await this.isCurrentActivity(pakageName, activityName);
-    if (!status) await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "start", "-n", `${pakageName}/${activityName}`]);
+    if (!status)
+      await issueShellCommand(this.adbPath, [
+        "-s",
+        this.serialNumber,
+        "shell",
+        "am",
+        "start",
+        "-n",
+        `${pakageName}/${activityName}`,
+      ]);
   }
 
   /**
@@ -209,10 +219,22 @@ export class Device {
 
   /**
    * Take a screencap and pull it out
-   * @param options 
+   * @param options
    */
   public async getScreencap(options?: { fileName?: string; pullPath?: string }) {
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "screencap", options?.fileName || "/sdcard/screen.png"]);
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "pull", options?.fileName || "/sdcard/screen.png", options?.pullPath || "./"]);
+    await issueShellCommand(this.adbPath, [
+      "-s",
+      this.serialNumber,
+      "shell",
+      "screencap",
+      options?.fileName || "/sdcard/screen.png",
+    ]);
+    await issueShellCommand(this.adbPath, [
+      "-s",
+      this.serialNumber,
+      "pull",
+      options?.fileName || "/sdcard/screen.png",
+      options?.pullPath || "./",
+    ]);
   }
 }
