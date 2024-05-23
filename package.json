@@ -22,7 +22,7 @@
   ],
   "author": "Roanne",
   "license": "MIT",
-  "description": "An easy-to-use adb library for making automated game software",
+  "description": "A zero-dependency and easy-to-use adb library for making automated game software",
   "devDependencies": {
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
