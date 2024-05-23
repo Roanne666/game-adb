@@ -13,9 +13,21 @@ export type Rect2 = {
   height?: number;
 };
 
+export type CommandChecker = (device: Device) => Promise<boolean> | boolean;
+
+export enum CommandLifeCycle {
+  "device_connect" = "device_connect",
+  "device_disconnect" = "device_disconnect",
+  "command_start" = "command_start",
+  "command_finish" = "command_finish",
+  "check_pass" = "check_pass",
+  "check_fail" = "check_fail",
+}
+
 export type CommandOptions = {
   preDelay?: number;
   postDelay?: number;
+  checker?: CommandChecker;
 };
 
 export type TaskOptions = {
@@ -25,5 +37,35 @@ export type TaskOptions = {
   preDelay?: number;
   postDelay?: number;
   next?: string[];
-  handler?: (device: Device) => Promise<boolean> | boolean;
+  checker?: CommandChecker;
+};
+
+export type TapCommandSchema = {
+  type: "tap";
+  rect: Rect2;
+  preDelay?: number;
+  postDelay?: number;
+};
+
+export type SwipeCommandSchema = {
+  type: "swipe";
+  originRect: Rect2;
+  targetRect: Rect2;
+  duration?: number;
+  preDelay?: number;
+  postDelay?: number;
+};
+
+export type KeyeventCommandSchema = {
+  type: "keyevent";
+  keycode: number;
+  preDelay?: number;
+  postDelay?: number;
+};
+
+export type TextCommandSchema = {
+  type: "text";
+  content: string;
+  preDelay?: number;
+  postDelay?: number;
 };
