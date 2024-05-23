@@ -1,14 +1,21 @@
 import { readFileSync } from "fs";
-import { type CommandBase, TapCommand, SwipeCommand } from "./command";
+import { type CommandBase, TapCommand, SwipeCommand, keyEventCommand, TextCommand } from "./command";
 import type { Device } from "./device";
-import type { Rect2, TaskOptions } from "./types";
+import type {
+  CommandChecker,
+  KeyeventCommandSchema,
+  SwipeCommandSchema,
+  TapCommandSchema,
+  TaskOptions,
+  TextCommandSchema,
+} from "./types";
 import { delay } from "./utils";
 
 export class Task {
   public readonly name: String;
   public readonly commands: CommandBase[] = [];
   public readonly next: string[] = [];
-  public readonly handler: (device: Device) => Promise<boolean> | boolean = () => true;
+  public readonly checker: CommandChecker = () => true;
 
   public readonly times: number = 1;
   public readonly preDelay: number = 500;
@@ -18,7 +25,7 @@ export class Task {
     this.name = options.name;
     this.commands.push(...options.commands);
     if (options.next) this.next.push(...options.next);
-    if (options.handler) this.handler = options.handler;
+    if (options.checker) this.checker = options.checker;
     if (options.times) this.times = options.times;
     if (options.preDelay) this.preDelay = options.preDelay;
     if (options.postDelay) this.postDelay = options.postDelay;
@@ -28,7 +35,7 @@ export class Task {
     await delay(this.preDelay);
 
     let status = false;
-    if (this.handler) status = await this.handler(device);
+    if (this.checker) status = await this.checker(device);
 
     if (status) {
       for (const command of this.commands) {
@@ -53,11 +60,17 @@ export class TaskFlow {
     this.device = device;
   }
 
-  public async addTask(task: Task) {
+  public addTask(task: Task) {
     this._tasks.push(task);
   }
 
-  public async addTasks(tasks: Task[]) {
+  public removeTask(taskName: string) {
+    const index = this._tasks.findIndex((t) => t.name === taskName);
+    if (index > -1) this._tasks.splice(index, 1);
+    return index > -1;
+  }
+
+  public addTasks(tasks: Task[]) {
     this._tasks.push(...tasks);
   }
 
@@ -89,17 +102,7 @@ export function createTaskFlowFromJson(jsonPath: string, device: Device) {
   const buffer = readFileSync(jsonPath);
   const data: {
     name: string;
-    commands: {
-      type: "tap" | "swipe" | "keyevent" | "text";
-      rect?: Rect2;
-      originRect?: Rect2;
-      targetRect?: Rect2;
-      duration?: number;
-      keycode?: number;
-      content?: string;
-      preDelay?: number;
-      postDelay?: number;
-    }[];
+    commands: (TapCommandSchema | SwipeCommandSchema | KeyeventCommandSchema | TextCommandSchema)[];
     preDelay?: number;
     postDelay?: number;
     times?: number;
@@ -112,15 +115,33 @@ export function createTaskFlowFromJson(jsonPath: string, device: Device) {
     for (const c of taskData.commands) {
       const type = c["type"];
       if (type === "tap") {
-        if (c.rect) {
-          commands.push(new TapCommand(c.rect, { preDelay: c.preDelay, postDelay: c.postDelay }));
-        }
+        commands.push(new TapCommand({ rect: c.rect, preDelay: c.preDelay, postDelay: c.postDelay }));
       } else if (type === "swipe") {
-        if (c.originRect && c.targetRect) {
-          commands.push(new SwipeCommand(c.originRect, c.targetRect, c.duration, { preDelay: c.preDelay, postDelay: c.postDelay }));
-        }
+        commands.push(
+          new SwipeCommand({
+            originRect: c.originRect,
+            targetRect: c.targetRect,
+            duration: c.duration,
+            preDelay: c.preDelay,
+            postDelay: c.postDelay,
+          })
+        );
       } else if (type === "keyevent") {
+        commands.push(
+          new keyEventCommand({
+            keyCode: c.keycode,
+            preDelay: c.preDelay,
+            postDelay: c.postDelay,
+          })
+        );
       } else if (type === "text") {
+        commands.push(
+          new TextCommand({
+            content: c.content,
+            preDelay: c.preDelay,
+            postDelay: c.postDelay,
+          })
+        );
       }
     }
 
