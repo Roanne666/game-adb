@@ -13,13 +13,10 @@ export class Adb {
    */
   public readonly path: string;
 
-  private _devices: Device[] = [];
   /**
    * The list of devices
    */
-  public get devices() {
-    return [...this._devices];
-  }
+  public devices: Device[] = [];
 
   constructor(adbPath: string) {
     this.path = adbPath;
@@ -29,15 +26,15 @@ export class Adb {
     if (retry === 0) throw "Adb get devices failed";
     const devicesStdout = await issueShellCommand(this.path, ["devices"]);
     const deviceInfoArray = devicesStdout.trim().split("\r\n");
-    let regAttached = false;
+    let devicesAttached = false;
     for (const info of deviceInfoArray) {
-      if (regAttached) {
+      if (devicesAttached) {
         const [serialNumber, connectStatus] = info.split("\t");
         const newDevice = new Device(this.path, serialNumber, connectStatus === "device" ? true : false);
-        await newDevice.init();
-        this._devices.push(newDevice);
+        newDevice.resolution = await newDevice.getResolution();
+        this.devices.push(newDevice);
       } else if (info === "List of devices attached") {
-        regAttached = true;
+        devicesAttached = true;
       }
     }
     if (this.devices.length === 0) {
