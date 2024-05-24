@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import { readFileSync } from "fs";
 import { type CommandBase, TapCommand, SwipeCommand, keyEventCommand, TextCommand } from "./command";
 import type { Device } from "./device";
@@ -6,6 +7,7 @@ import type {
   KeyeventCommandSchema,
   SwipeCommandSchema,
   TapCommandSchema,
+  TaskLifeCycle,
   TaskOptions,
   TextCommandSchema,
 } from "./types";
@@ -20,6 +22,8 @@ export class Task {
   public readonly times: number = 1;
   public readonly preDelay: number = 500;
   public readonly postDelay: number = 500;
+
+  private readonly _eventEmitter = new EventEmitter();
 
   constructor(options: TaskOptions) {
     this.name = options.name;
@@ -43,35 +47,50 @@ export class Task {
       }
     }
 
-    await delay(this.preDelay);
+    await delay(this.postDelay);
     return status;
+  }
+
+  /**
+   * Add listener to task life cycle event
+   * @param eventName
+   * @param listener
+   */
+  public on(eventName: TaskLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmitter.on(eventName, listener);
+  }
+
+  /**
+   * Remove Listener to task life cycle event
+   * @param eventName
+   * @param listener
+   */
+  public off(eventName: TaskLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmitter.off(eventName, listener);
   }
 }
 
 export class TaskFlow {
   private readonly device: Device;
 
-  private _tasks: Task[] = [];
-  public get tasks() {
-    return [...this._tasks];
-  }
+  public tasks: Task[] = [];
 
   constructor(device: Device) {
     this.device = device;
   }
 
   public addTask(task: Task) {
-    this._tasks.push(task);
+    this.tasks.push(task);
   }
 
   public removeTask(taskName: string) {
-    const index = this._tasks.findIndex((t) => t.name === taskName);
-    if (index > -1) this._tasks.splice(index, 1);
+    const index = this.tasks.findIndex((t) => t.name === taskName);
+    if (index > -1) this.tasks.splice(index, 1);
     return index > -1;
   }
 
   public addTasks(tasks: Task[]) {
-    this._tasks.push(...tasks);
+    this.tasks.push(...tasks);
   }
 
   public async run(taskName: string | undefined = undefined) {
