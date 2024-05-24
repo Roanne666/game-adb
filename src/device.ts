@@ -18,15 +18,9 @@ export class Device {
    */
   public readonly serialNumber: string;
 
-  public readonly resolution: Vector2 = { x: 0, y: 0 };
+  public resolution: Vector2 = { x: 0, y: 0 };
 
-  private _commandResolution: Vector2 = { x: 1280, y: 720 };
-  public get commandResolution() {
-    return this._commandResolution;
-  }
-  public set commandResolution(value: Vector2) {
-    this._commandResolution = value;
-  }
+  public commandResolution: Vector2 = { x: 1280, y: 720 };
 
   private get resolutionRatio(): Vector2 {
     return { x: this.resolution.x / this.commandResolution.x, y: this.resolution.y / this.commandResolution.y };
@@ -53,13 +47,7 @@ export class Device {
     return this._running;
   }
 
-  private _commandQueue: CommandBase[] = [];
-  /**
-   * The command will be added to the commandQueue after using the addCommond function,.
-   */
-  public get commandQueue() {
-    return [...this._commandQueue];
-  }
+  public commandQueue: CommandBase[] = [];
 
   private readonly _eventEmmiter = new EventEmitter();
 
@@ -67,12 +55,6 @@ export class Device {
     this.adbPath = adbPath;
     this.serialNumber = serialNumber;
     this._connected = connectStatus;
-  }
-
-  public async init() {
-    const resolution = await this.getResolution();
-    this.resolution.x = resolution.x;
-    this.resolution.y = resolution.y;
   }
 
   /**
@@ -99,7 +81,7 @@ export class Device {
     if (status) {
       this._eventEmmiter.emit(CommandLifeCycle.check_pass, command);
     } else {
-      this._commandQueue.length = 0;
+      this.commandQueue.length = 0;
       this._running = false;
       this._eventEmmiter.emit(CommandLifeCycle.check_fail, command);
       return;
@@ -115,8 +97,8 @@ export class Device {
 
     this._eventEmmiter.emit(CommandLifeCycle.command_finish, command);
 
-    if (this._commandQueue.length > 0 && this.autoRun) {
-      const nextCommand = this._commandQueue.shift() as CommandBase;
+    if (this.commandQueue.length > 0 && this.autoRun) {
+      const nextCommand = this.commandQueue.shift() as CommandBase;
       this.issueCommand(nextCommand);
     } else {
       this._running = false;
@@ -131,19 +113,36 @@ export class Device {
     if (this.autoRun && !this.running) {
       this.issueCommand(command);
     } else {
-      this._commandQueue.push(command);
+      this.commandQueue.push(command);
     }
   }
 
   /**
-   * Manually trigger the command, which only works when autoRun is false
+   * Manually run next command.
+   * Only works when autoRun is false.
    * @returns command execute status
    */
   public async nextCommand() {
-    if (this.autoRun || this._running || this._commandQueue.length === 0) return false;
-    const nextCommand = this._commandQueue.shift() as CommandBase;
+    if (this.autoRun || this._running || this.commandQueue.length === 0) return false;
+    const nextCommand = this.commandQueue.shift() as CommandBase;
     await this.issueCommand(nextCommand);
     return true;
+  }
+
+  /**
+   * Manually run specified command.
+   * Only works when autoRun is false.
+   * @param commandId
+   */
+  public async runCommand(commandId: string) {
+    if (this.autoRun || this._running || this.commandQueue.length === 0) return false;
+    const nextCommand = this.commandQueue.find((c) => c.id === commandId);
+    if (nextCommand) {
+      await this.issueCommand(nextCommand);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   /**
