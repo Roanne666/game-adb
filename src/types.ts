@@ -16,8 +16,6 @@ export type Rect2 = {
 export type CommandChecker = (device: Device) => Promise<boolean> | boolean;
 
 export enum CommandLifeCycle {
-  "device_connect" = "device_connect",
-  "device_disconnect" = "device_disconnect",
   "command_start" = "command_start",
   "command_finish" = "command_finish",
   "check_pass" = "check_pass",
@@ -29,6 +27,13 @@ export type CommandOptions = {
   postDelay?: number;
   checker?: CommandChecker;
 };
+
+export enum TaskLifeCycle {
+  "task_start" = "task_start",
+  "task_finish" = "task_finish",
+  "check_pass" = "check_pass",
+  "check_fail" = "check_fail",
+}
 
 export type TaskOptions = {
   name: string;
