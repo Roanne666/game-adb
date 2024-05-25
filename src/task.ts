@@ -117,11 +117,12 @@ export class TaskFlow {
   }
 }
 
-export function createTaskFlowFromJson(jsonPath: string, device: Device) {
+export function createTaskFlowFromJson(jsonPath: string, device: Device, checkers: CommandChecker[] = []) {
   const buffer = readFileSync(jsonPath);
   const data: {
     name: string;
     commands: (TapCommandSchema | SwipeCommandSchema | KeyeventCommandSchema | TextCommandSchema)[];
+    checker?: { name: string; args?: string[] };
     preDelay?: number;
     postDelay?: number;
     times?: number;
@@ -131,36 +132,14 @@ export function createTaskFlowFromJson(jsonPath: string, device: Device) {
   const taskFlow = new TaskFlow(device);
   for (const taskData of data) {
     const commands: CommandBase[] = [];
-    for (const c of taskData.commands) {
-      const type = c["type"];
-      if (type === "tap") {
-        commands.push(new TapCommand({ rect: c.rect, preDelay: c.preDelay, postDelay: c.postDelay }));
-      } else if (type === "swipe") {
-        commands.push(
-          new SwipeCommand({
-            originRect: c.originRect,
-            targetRect: c.targetRect,
-            duration: c.duration,
-            preDelay: c.preDelay,
-            postDelay: c.postDelay,
-          })
-        );
-      } else if (type === "keyevent") {
-        commands.push(
-          new keyEventCommand({
-            keyCode: c.keycode,
-            preDelay: c.preDelay,
-            postDelay: c.postDelay,
-          })
-        );
-      } else if (type === "text") {
-        commands.push(
-          new TextCommand({
-            content: c.content,
-            preDelay: c.preDelay,
-            postDelay: c.postDelay,
-          })
-        );
+    for (const cm of taskData.commands) {
+      const chcker: CommandChecker | undefined = checkers.find((c) => c.name === cm.checker?.name);
+      if (chcker && cm.checker?.args) {
+        chcker.handler = chcker.handler.bind(cm.checker.args);
+      }
+      const newCommand: CommandBase | undefined = createCommand(cm, chcker);
+      if (newCommand) {
+        commands.push(newCommand);
       }
     }
 
@@ -176,4 +155,44 @@ export function createTaskFlowFromJson(jsonPath: string, device: Device) {
   }
 
   return taskFlow;
+}
+
+function createCommand(
+  commandData: TapCommandSchema | SwipeCommandSchema | KeyeventCommandSchema | TextCommandSchema,
+  checker?: CommandChecker | undefined
+) {
+  switch (commandData.type) {
+    case "tap":
+      return new TapCommand({
+        rect: commandData.rect,
+        checker,
+        preDelay: commandData.preDelay,
+        postDelay: commandData.postDelay,
+      });
+    case "swipe":
+      return new SwipeCommand({
+        originRect: commandData.originRect,
+        targetRect: commandData.targetRect,
+        duration: commandData.duration,
+        checker: checker,
+        preDelay: commandData.preDelay,
+        postDelay: commandData.postDelay,
+      });
+    case "keyevent":
+      return new keyEventCommand({
+        keyCode: commandData.keycode,
+        checker,
+        preDelay: commandData.preDelay,
+        postDelay: commandData.postDelay,
+      });
+    case "text":
+      return new TextCommand({
+        content: commandData.content,
+        checker,
+        preDelay: commandData.preDelay,
+        postDelay: commandData.postDelay,
+      });
+    default:
+      return undefined;
+  }
 }
