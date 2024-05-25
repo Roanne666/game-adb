@@ -17,7 +17,7 @@ export class Task {
   public readonly name: String;
   public readonly commands: CommandBase[] = [];
   public readonly next: string[] = [];
-  public readonly checker: CommandChecker = () => true;
+  public readonly checker: CommandChecker = { handler: () => true };
 
   public readonly times: number = 1;
   public readonly preDelay: number = 500;
@@ -39,7 +39,7 @@ export class Task {
     await delay(this.preDelay);
 
     let status = false;
-    if (this.checker) status = await this.checker(device);
+    if (this.checker) status = await this.checker.handler(device);
 
     if (status) {
       for (const command of this.commands) {

@@ -77,7 +77,7 @@ export class Device {
     this._eventEmmiter.emit(CommandLifeCycle.command_start, command);
     await delay(command.preDelay);
 
-    const status = await command.checker(this);
+    const status = await command.checker.handler(this);
     if (status) {
       this._eventEmmiter.emit(CommandLifeCycle.check_pass, command);
 

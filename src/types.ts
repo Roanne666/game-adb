@@ -13,7 +13,10 @@ export type Rect2 = {
   height?: number;
 };
 
-export type CommandChecker = (device: Device) => Promise<boolean> | boolean;
+export type CommandChecker = {
+  name?: string;
+  handler: (device: Device) => Promise<boolean> | boolean;
+};
 
 export enum CommandLifeCycle {
   "command_start" = "command_start",

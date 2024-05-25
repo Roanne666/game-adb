@@ -7,7 +7,7 @@ export abstract class CommandBase {
   public readonly id: string = `command-${CommandBase.commandCount++}`;
   public readonly preDelay: number = 500;
   public readonly postDelay: number = 500;
-  public readonly checker: CommandChecker = () => true;
+  public readonly checker: CommandChecker = { handler: () => true };
 
   constructor(options?: CommandOptions) {
     if (options?.preDelay) this.preDelay = options.preDelay;
