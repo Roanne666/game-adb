@@ -48,32 +48,30 @@ export type TaskOptions = {
   checker?: CommandChecker;
 };
 
-export type TapCommandSchema = {
-  type: "tap";
-  rect: Rect2;
+export type CommandSchemaOptions = {
+  checker?: { name: string; args?: string[] };
   preDelay?: number;
   postDelay?: number;
 };
 
-export type SwipeCommandSchema = {
+export interface TapCommandSchema extends CommandSchemaOptions {
+  type: "tap";
+  rect: Rect2;
+}
+
+export interface SwipeCommandSchema extends CommandSchemaOptions {
   type: "swipe";
   originRect: Rect2;
   targetRect: Rect2;
   duration?: number;
-  preDelay?: number;
-  postDelay?: number;
-};
+}
 
-export type KeyeventCommandSchema = {
+export interface KeyeventCommandSchema extends CommandSchemaOptions {
   type: "keyevent";
   keycode: number;
-  preDelay?: number;
-  postDelay?: number;
-};
+}
 
-export type TextCommandSchema = {
+export interface TextCommandSchema extends CommandSchemaOptions {
   type: "text";
   content: string;
-  preDelay?: number;
-  postDelay?: number;
-};
+}
