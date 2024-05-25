@@ -72,7 +72,7 @@ export class Device {
    * Issue standard command
    * @param command
    */
-  public async issueCommand(command: CommandBase) {
+  public async issueCommand(command: CommandBase): Promise<boolean> {
     this._running = true;
     this._eventEmmiter.emit(CommandLifeCycle.command_start, command);
     await delay(command.preDelay);
@@ -80,29 +80,30 @@ export class Device {
     const status = await command.checker(this);
     if (status) {
       this._eventEmmiter.emit(CommandLifeCycle.check_pass, command);
+
+      await issueShellCommand(this.adbPath, [
+        "-s",
+        this.serialNumber,
+        "shell",
+        ...command.getCommandArgs(this.resolutionRatio),
+      ]);
+      await delay(command.postDelay);
+
+      this._eventEmmiter.emit(CommandLifeCycle.command_finish, command);
+
+      if (this.commandQueue.length > 0 && this.autoRun) {
+        const nextCommand = this.commandQueue.shift() as CommandBase;
+        const nextStatus = await this.issueCommand(nextCommand);
+        return nextStatus;
+      } else {
+        this._running = false;
+      }
     } else {
       this.commandQueue.length = 0;
       this._running = false;
       this._eventEmmiter.emit(CommandLifeCycle.check_fail, command);
-      return;
     }
-
-    await issueShellCommand(this.adbPath, [
-      "-s",
-      this.serialNumber,
-      "shell",
-      ...command.getCommandArgs(this.resolutionRatio),
-    ]);
-    await delay(command.postDelay);
-
-    this._eventEmmiter.emit(CommandLifeCycle.command_finish, command);
-
-    if (this.commandQueue.length > 0 && this.autoRun) {
-      const nextCommand = this.commandQueue.shift() as CommandBase;
-      this.issueCommand(nextCommand);
-    } else {
-      this._running = false;
-    }
+    return status;
   }
 
   /**
