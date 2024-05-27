@@ -1,7 +1,23 @@
 import { EventEmitter } from "events";
-import type { CommandBase } from "./command";
-import { CommandLifeCycle, type Vector2 } from "./types";
+import type { CommandBase, CommandLifeCycle } from "./command";
+import { type Vector2 } from "./types";
 import { delay, issueShellCommand } from "./utils";
+
+export class DeviceEmitter<K extends string, T extends object = never> {
+  private emitter = new EventEmitter();
+
+  on(eventName: K, listener: (command: CommandBase) => void): void {
+    this.emitter.on(eventName, listener);
+  }
+
+  off(eventName: K, listener: (command: CommandBase) => void): void {
+    this.emitter.off(eventName, listener);
+  }
+
+  emit(eventName: K, arg?: T): void {
+    this.emitter.emit(eventName, arg);
+  }
+}
 
 /**
  * The Device instance is binding with specific serial number of adb device.
@@ -34,11 +50,6 @@ export class Device {
     return this._connected;
   }
 
-  /**
-   * The command will be automatically executed after using the addCommand function if autoRun is true.
-   */
-  public autoRun = true;
-
   private _running = false;
   /**
    * Determines whether the command is running
@@ -47,9 +58,7 @@ export class Device {
     return this._running;
   }
 
-  public commandQueue: CommandBase[] = [];
-
-  private readonly _eventEmmiter = new EventEmitter();
+  private readonly _eventEmmiter = new DeviceEmitter<CommandLifeCycle, CommandBase>();
 
   constructor(adbPath: string, serialNumber: string, connectStatus: boolean) {
     this.adbPath = adbPath;
@@ -69,17 +78,36 @@ export class Device {
   }
 
   /**
-   * Issue standard command
+   * Issue specified command
    * @param command
    */
-  public async issueCommand(command: CommandBase): Promise<boolean> {
+  public async issueCommand(command: CommandBase): Promise<void> {
     this._running = true;
-    this._eventEmmiter.emit(CommandLifeCycle.command_start, command);
+    this._eventEmmiter.emit("command_start", command);
     await delay(command.preDelay);
 
-    const status = await command.checker.handler(this);
-    if (status) {
-      this._eventEmmiter.emit(CommandLifeCycle.check_pass, command);
+    await issueShellCommand(this.adbPath, [
+      "-s",
+      this.serialNumber,
+      "shell",
+      ...command.getCommandArgs(this.resolutionRatio),
+    ]);
+    await delay(command.postDelay);
+
+    this._eventEmmiter.emit("command_finish", command);
+
+    this._running = false;
+  }
+
+  /**
+   * Issue specified commands
+   * @param commands
+   */
+  public async issueCommands(commands: CommandBase[]): Promise<void> {
+    this._running = true;
+    for (const command of commands) {
+      this._eventEmmiter.emit("command_start", command);
+      await delay(command.preDelay);
 
       await issueShellCommand(this.adbPath, [
         "-s",
@@ -89,61 +117,9 @@ export class Device {
       ]);
       await delay(command.postDelay);
 
-      this._eventEmmiter.emit(CommandLifeCycle.command_finish, command);
-
-      if (this.commandQueue.length > 0 && this.autoRun) {
-        const nextCommand = this.commandQueue.shift() as CommandBase;
-        const nextStatus = await this.issueCommand(nextCommand);
-        return nextStatus;
-      } else {
-        this._running = false;
-      }
-    } else {
-      this.commandQueue.length = 0;
-      this._running = false;
-      this._eventEmmiter.emit(CommandLifeCycle.check_fail, command);
+      this._eventEmmiter.emit("command_finish", command);
     }
-    return status;
-  }
-
-  /**
-   * Add command to command queue
-   * @param command
-   */
-  public addCommand(command: CommandBase) {
-    if (this.autoRun && !this.running) {
-      this.issueCommand(command);
-    } else {
-      this.commandQueue.push(command);
-    }
-  }
-
-  /**
-   * Manually run next command.
-   * Only works when autoRun is false.
-   * @returns command execute status
-   */
-  public async nextCommand() {
-    if (this.autoRun || this._running || this.commandQueue.length === 0) return false;
-    const nextCommand = this.commandQueue.shift() as CommandBase;
-    await this.issueCommand(nextCommand);
-    return true;
-  }
-
-  /**
-   * Manually run specified command.
-   * Only works when autoRun is false.
-   * @param commandId
-   */
-  public async runCommand(commandId: string) {
-    if (this.autoRun || this._running || this.commandQueue.length === 0) return false;
-    const nextCommand = this.commandQueue.find((c) => c.id === commandId);
-    if (nextCommand) {
-      await this.issueCommand(nextCommand);
-      return true;
-    } else {
-      return false;
-    }
+    this._running = false;
   }
 
   /**

@@ -1,5 +1,12 @@
-import type { CommandChecker, CommandOptions, Rect2, Vector2 } from "./types";
+import type { Rect2, Vector2 } from "./types";
 import { getRandomPosition } from "./utils";
+
+export type CommandLifeCycle = "command_start" | "command_finish";
+
+export type CommandOptions = {
+  preDelay?: number;
+  postDelay?: number;
+};
 
 export abstract class CommandBase {
   static commandCount = 0;
@@ -7,12 +14,10 @@ export abstract class CommandBase {
   public readonly id: string = `command-${CommandBase.commandCount++}`;
   public readonly preDelay: number = 500;
   public readonly postDelay: number = 500;
-  public readonly checker: CommandChecker = { handler: () => true };
 
   constructor(options?: CommandOptions) {
     if (options?.preDelay) this.preDelay = options.preDelay;
     if (options?.postDelay) this.postDelay = options.postDelay;
-    if (options?.checker) this.checker = options.checker;
   }
 
   public abstract getCommandArgs(resolutionRatio: Vector2): string[];
