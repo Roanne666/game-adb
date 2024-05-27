@@ -20,17 +20,17 @@ let adCount = 1;
 
 async function runCommands(device: Device) {
   if (adCount <= 10) {
-    await device.issueCommand(enterFirstAd);
+    await device.issueShellCommand(enterFirstAd);
   } else if (adCount <= 20) {
-    await device.issueCommand(enterSecondAd);
+    await device.issueShellCommand(enterSecondAd);
   } else if (adCount <= 30) {
-    await device.issueCommand(enterThirdAd);
+    await device.issueShellCommand(enterThirdAd);
   } else {
     return;
   }
-  await device.issueCommand(exitAd);
-  await device.issueCommand(reviceAward);
-  await device.issueCommand(finishCommand);
+  await device.issueShellCommand(exitAd);
+  await device.issueShellCommand(reviceAward);
+  await device.issueShellCommand(finishCommand);
 }
 
 (async () => {

@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import type { CommandBase, CommandLifeCycle } from "./command";
 import { type Vector2 } from "./types";
-import { delay, issueShellCommand } from "./utils";
+import { delay, issueCommand } from "./utils";
 
 export class DeviceEmitter<K extends string, T extends object = never> {
   private emitter = new EventEmitter();
@@ -70,9 +70,9 @@ export class Device {
    * Issue command by text
    * @param commandText
    */
-  public async issueCommandText(commandText: string) {
+  public async issueShellCommandText(commandText: string) {
     this._running = true;
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", commandText]);
+    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", commandText]);
     this._running = false;
     return result;
   }
@@ -81,12 +81,12 @@ export class Device {
    * Issue specified command
    * @param command
    */
-  public async issueCommand(command: CommandBase): Promise<void> {
+  public async issueShellCommand(command: CommandBase): Promise<void> {
     this._running = true;
     this._eventEmmiter.emit("command_start", command);
     await delay(command.preDelay);
 
-    await issueShellCommand(this.adbPath, [
+    await issueCommand(this.adbPath, [
       "-s",
       this.serialNumber,
       "shell",
@@ -103,13 +103,13 @@ export class Device {
    * Issue specified commands
    * @param commands
    */
-  public async issueCommands(commands: CommandBase[]): Promise<void> {
+  public async issueShellCommands(commands: CommandBase[]): Promise<void> {
     this._running = true;
     for (const command of commands) {
       this._eventEmmiter.emit("command_start", command);
       await delay(command.preDelay);
 
-      await issueShellCommand(this.adbPath, [
+      await issueCommand(this.adbPath, [
         "-s",
         this.serialNumber,
         "shell",
@@ -145,7 +145,7 @@ export class Device {
    * @returns
    */
   public async getResolution(): Promise<Vector2> {
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
+    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
     const [width, height] = result.split(":")[1].split("x");
     return { x: Number(width.trim()), y: Number(height.trim()) };
   }
@@ -156,7 +156,7 @@ export class Device {
    * @returns
    */
   public async isCurrentActivity(packageName: string, activityName: string) {
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
+    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
     const resultLines = result.split("\r\n");
     for (const line of resultLines) {
       if (line.includes("mCurrentFocus") && line.includes(`${packageName}/${activityName}`)) {
@@ -174,7 +174,7 @@ export class Device {
   public async startApp(pakageName: string, activityName: string) {
     const status = await this.isCurrentActivity(pakageName, activityName);
     if (!status)
-      await issueShellCommand(this.adbPath, [
+      await issueCommand(this.adbPath, [
         "-s",
         this.serialNumber,
         "shell",
@@ -190,7 +190,7 @@ export class Device {
    * @param pakageName
    */
   public async closeApp(pakageName: string) {
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
+    await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
   }
 
   /**
@@ -198,14 +198,14 @@ export class Device {
    * @param options
    */
   public async getScreencap(options?: { fileName?: string; pullPath?: string }) {
-    await issueShellCommand(this.adbPath, [
+    await issueCommand(this.adbPath, [
       "-s",
       this.serialNumber,
       "shell",
       "screencap",
       options?.fileName || "/sdcard/screen.png",
     ]);
-    await issueShellCommand(this.adbPath, [
+    await issueCommand(this.adbPath, [
       "-s",
       this.serialNumber,
       "pull",

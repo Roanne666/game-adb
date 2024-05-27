@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import type { Rect2, Vector2 } from "./types";
 
-export async function issueShellCommand(adbPath: string, args: string[]) {
+export async function issueCommand(adbPath: string, args: string[]) {
   const result = await new Promise<string>((resolve) => {
     execFile(adbPath, args, (error, stdout, stderr) => {
       if (error) throw error;

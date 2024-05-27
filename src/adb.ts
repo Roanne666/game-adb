@@ -1,5 +1,5 @@
 import { Device } from "./device";
-import { issueShellCommand } from "./utils";
+import { issueCommand } from "./utils";
 
 export async function createAdb(adbPath: string) {
   const adb = new Adb(adbPath);
@@ -24,7 +24,7 @@ export class Adb {
 
   public async initDevices(retry = 3) {
     if (retry === 0) throw "Adb get devices failed";
-    const devicesStdout = await issueShellCommand(this.path, ["devices"]);
+    const devicesStdout = await issueCommand(this.path, ["devices"]);
     const deviceInfoArray = devicesStdout.trim().split("\r\n");
     let devicesAttached = false;
     for (const info of deviceInfoArray) {
