@@ -1,12 +1,8 @@
-import { createAdb, TapCommand, Device, CommandLifeCycle } from "../src";
+import { createAdb, TapCommand, Device } from "../src";
 
 const enterFirstAd = new TapCommand({
   rect: { x: 789, y: 225, width: 212, height: 75 },
   postDelay: 1000 * 40,
-  checker(device: Device) {
-    console.log(device.serialNumber);
-    return true;
-  },
 });
 const enterSecondAd = new TapCommand({
   rect: { x: 793, y: 356, width: 212, height: 75 },
@@ -22,19 +18,19 @@ const finishCommand = new TapCommand({ rect: { x: 711, y: 415, width: 100, heigh
 
 let adCount = 1;
 
-function addCommands(device: Device) {
+async function runCommands(device: Device) {
   if (adCount <= 10) {
-    device.addCommand(enterFirstAd);
+    await device.issueCommand(enterFirstAd);
   } else if (adCount <= 20) {
-    device.addCommand(enterSecondAd);
+    await device.issueCommand(enterSecondAd);
   } else if (adCount <= 30) {
-    device.addCommand(enterThirdAd);
+    await device.issueCommand(enterThirdAd);
   } else {
     return;
   }
-  device.addCommand(exitAd);
-  device.addCommand(reviceAward);
-  device.addCommand(finishCommand);
+  await device.issueCommand(exitAd);
+  await device.issueCommand(reviceAward);
+  await device.issueCommand(finishCommand);
 }
 
 (async () => {
@@ -43,14 +39,14 @@ function addCommands(device: Device) {
   const device = adb.devices.find((d) => d.serialNumber === "emulator-5554");
 
   if (device) {
-    addCommands(device);
-
-    device.on(CommandLifeCycle.command_finish, (command) => {
+    device.on("command_finish", (command) => {
       if (command.id === finishCommand.id) {
         console.log(`Ad finish - current count ${adCount}`);
         adCount++;
-        addCommands(device);
+        runCommands(device);
       }
     });
+
+    runCommands(device);
   }
 })();
