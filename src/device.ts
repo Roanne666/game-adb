@@ -155,12 +155,15 @@ export class Device {
    * @param activityName
    * @returns
    */
-  public async isCurrentActivity(packageName: string, activityName: string) {
+  public async isCurrentActivity(packageName: string, activityName?: string) {
     const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
     const resultLines = result.split("\r\n");
     for (const line of resultLines) {
-      if (line.includes("mCurrentFocus") && line.includes(`${packageName}/${activityName}`)) {
-        return true;
+      if (!line.includes("mCurrentFocus")) continue;
+      if (activityName) {
+        if (line.includes(`${packageName}/${activityName}`)) return true;
+      } else {
+        if (line.includes(packageName)) return true;
       }
     }
     return false;
@@ -171,9 +174,11 @@ export class Device {
    * @param pakageName
    * @param activityName
    */
-  public async startApp(pakageName: string, activityName: string) {
+  public async startApp(pakageName: string, activityName: string, timeout = 10000) {
     const status = await this.isCurrentActivity(pakageName, activityName);
-    if (!status)
+    if (status) {
+      return true;
+    } else {
       await issueCommand(this.adbPath, [
         "-s",
         this.serialNumber,
@@ -183,14 +188,49 @@ export class Device {
         "-n",
         `${pakageName}/${activityName}`,
       ]);
+      return new Promise<boolean>(async (resolve) => {
+        let retry = 0;
+        const interval = setInterval(async () => {
+          if (retry * 1000 >= timeout) {
+            clearInterval(interval);
+            resolve(false);
+          } else {
+            const status = await this.isCurrentActivity(`${pakageName}/${activityName}`);
+            if (status) {
+              clearInterval(interval);
+              resolve(true);
+            } else {
+              retry++;
+            }
+          }
+        });
+      });
+    }
   }
 
   /**
    * Close an app
    * @param pakageName
    */
-  public async closeApp(pakageName: string) {
+  public async closeApp(pakageName: string, timeout = 10000) {
     await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
+    return new Promise<boolean>(async (resolve) => {
+      let retry = 0;
+      const interval = setInterval(async () => {
+        if (retry * 1000 >= timeout) {
+          clearInterval(interval);
+          resolve(false);
+        } else {
+          const status = await this.isCurrentActivity(pakageName);
+          if (status) {
+            retry++;
+          } else {
+            clearInterval(interval);
+            resolve(true);
+          }
+        }
+      });
+    });
   }
 
   /**
