@@ -1,7 +1,7 @@
 {
   "name": "game-adb",
-  "version": "1.0.2",
-  "main": "index.ts",
+  "version": "1.0.3",
+  "main": "./lib/",
   "scripts": {
     "build": "tsc",
     "test-command": "ts-node ./test/test-command.ts",
