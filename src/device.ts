@@ -72,7 +72,12 @@ export class Device {
    */
   public async issueShellCommandText(commandText: string) {
     this._running = true;
-    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", commandText]);
+    const result = await issueCommand({
+      adbPath: this.adbPath,
+      serialNumber: this.serialNumber,
+      isShellCommand: true,
+      args: commandText.split(" "),
+    });
     this._running = false;
     return result;
   }
@@ -86,12 +91,13 @@ export class Device {
     this._eventEmmiter.emit("command_start", command);
     await delay(command.preDelay);
 
-    await issueCommand(this.adbPath, [
-      "-s",
-      this.serialNumber,
-      "shell",
-      ...command.getCommandArgs(this.resolutionRatio),
-    ]);
+    await issueCommand({
+      adbPath: this.adbPath,
+      serialNumber: this.serialNumber,
+      isShellCommand: true,
+      args: command.getCommandArgs(this.resolutionRatio),
+    });
+
     await delay(command.postDelay);
 
     this._eventEmmiter.emit("command_finish", command);
@@ -104,22 +110,9 @@ export class Device {
    * @param commands
    */
   public async issueShellCommands(commands: CommandBase[]): Promise<void> {
-    this._running = true;
     for (const command of commands) {
-      this._eventEmmiter.emit("command_start", command);
-      await delay(command.preDelay);
-
-      await issueCommand(this.adbPath, [
-        "-s",
-        this.serialNumber,
-        "shell",
-        ...command.getCommandArgs(this.resolutionRatio),
-      ]);
-      await delay(command.postDelay);
-
-      this._eventEmmiter.emit("command_finish", command);
+      await this.issueShellCommand(command);
     }
-    this._running = false;
   }
 
   /**
@@ -145,7 +138,7 @@ export class Device {
    * @returns
    */
   public async getResolution(): Promise<Vector2> {
-    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
+    const result = await this.issueShellCommandText("wm size");
     const [width, height] = result.split(":")[1].split("x");
     return { x: Number(width.trim()), y: Number(height.trim()) };
   }
@@ -156,7 +149,7 @@ export class Device {
    * @returns
    */
   public async isCurrentActivity(packageName: string, activityName?: string) {
-    const result = await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
+    const result = await this.issueShellCommandText("dumpsys window");
     const resultLines = result.split("\r\n");
     for (const line of resultLines) {
       if (!line.includes("mCurrentFocus")) continue;
@@ -179,15 +172,7 @@ export class Device {
     if (status) {
       return true;
     } else {
-      await issueCommand(this.adbPath, [
-        "-s",
-        this.serialNumber,
-        "shell",
-        "am",
-        "start",
-        "-n",
-        `${pakageName}/${activityName}`,
-      ]);
+      await this.issueShellCommandText(`am start -n ${pakageName}/${activityName}`);
       return new Promise<boolean>(async (resolve) => {
         let retry = 0;
         const interval = setInterval(async () => {
@@ -213,7 +198,7 @@ export class Device {
    * @param pakageName
    */
   public async closeApp(pakageName: string, timeout = 10000) {
-    await issueCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
+    await this.issueShellCommandText(`am force-stop ${pakageName}`);
     return new Promise<boolean>(async (resolve) => {
       let retry = 0;
       const interval = setInterval(async () => {
@@ -238,19 +223,7 @@ export class Device {
    * @param options
    */
   public async getScreencap(options?: { fileName?: string; pullPath?: string }) {
-    await issueCommand(this.adbPath, [
-      "-s",
-      this.serialNumber,
-      "shell",
-      "screencap",
-      options?.fileName || "/sdcard/screen.png",
-    ]);
-    await issueCommand(this.adbPath, [
-      "-s",
-      this.serialNumber,
-      "pull",
-      options?.fileName || "/sdcard/screen.png",
-      options?.pullPath || "./",
-    ]);
+    await this.issueShellCommandText(`screencap ${options?.fileName || "/sdcard/screen.png"}`);
+    await this.issueShellCommandText(`pull ${options?.fileName || "/sdcard/screen.png"} ${options?.pullPath || "./"}`);
   }
 }
