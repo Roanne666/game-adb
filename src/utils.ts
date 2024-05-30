@@ -1,14 +1,36 @@
 import { execFile } from "child_process";
 import type { Rect2, Vector2 } from "./types";
 
-export async function issueCommand(adbPath: string, args: string[]) {
+export type IssueOptions = {
+  adbPath: string;
+  serialNumber?: string;
+  isShellCommand?: boolean;
+  args: string[];
+};
+
+export async function issueCommand(issueOptions: IssueOptions) {
   const result = await new Promise<string>((resolve) => {
-    execFile(adbPath, args, (error, stdout, stderr) => {
+    execFile(issueOptions.adbPath, handleArgs(issueOptions), (error, stdout, stderr) => {
       if (error) throw error;
       resolve(stderr === "" ? stdout : stderr);
     });
   });
   return result;
+}
+
+function handleArgs(issueOptions: IssueOptions) {
+  const finalArgs: string[] = [];
+  if (issueOptions.serialNumber) {
+    finalArgs.push("-s", issueOptions.serialNumber);
+  }
+
+  if (issueOptions.isShellCommand) {
+    finalArgs.push("shell");
+  }
+
+  finalArgs.push(...issueOptions.args);
+
+  return finalArgs;
 }
 
 export function getRandomPosition(rect: Rect2): Vector2 {
