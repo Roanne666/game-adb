@@ -34,12 +34,20 @@ export class Device {
    */
   public readonly serialNumber: string;
 
-  public resolution: Vector2 = { x: 0, y: 0 };
+  /**
+   * Check whether device is connected before issue a command
+   */
+  public autoCheckConnected = true;
+
+  public deviceResolution: Vector2 = { x: 0, y: 0 };
 
   public commandResolution: Vector2 = { x: 1280, y: 720 };
 
   private get resolutionRatio(): Vector2 {
-    return { x: this.resolution.x / this.commandResolution.x, y: this.resolution.y / this.commandResolution.y };
+    return {
+      x: this.deviceResolution.x / this.commandResolution.x,
+      y: this.deviceResolution.y / this.commandResolution.y,
+    };
   }
 
   private _connected: boolean;
@@ -66,11 +74,40 @@ export class Device {
     this._connected = connectStatus;
   }
 
+  public async checkConnected(retry = 3) {
+    for (let i = 0; i < retry; i++) {
+      const devicesStdout = await issueCommand({ adbPath: this.adbPath, args: ["devices"] });
+      const deviceInfoArray = devicesStdout.trim().split("\r\n");
+      let devicesAttached = false;
+      for (const info of deviceInfoArray) {
+        if (devicesAttached) {
+          const [serialNumber, connectStatus] = info.split("\t");
+          if (serialNumber === this.serialNumber) {
+            return connectStatus === "device";
+          }
+        } else if (info === "List of devices attached") {
+          devicesAttached = true;
+        }
+      }
+
+      if (i < retry - 1) {
+        await delay(3000);
+      } else {
+        console.log("Adb get devices failed");
+      }
+    }
+
+    return false;
+  }
+
   /**
    * Issue command by text
    * @param commandText
    */
-  public async issueShellCommandText(commandText: string) {
+  public async issueShellCommandText(commandText: string): Promise<string> {
+    if (this.autoCheckConnected) this._connected = await this.checkConnected();
+    if (!this._connected) return "";
+
     this._running = true;
     const result = await issueCommand({
       adbPath: this.adbPath,
@@ -86,7 +123,10 @@ export class Device {
    * Issue specified command
    * @param command
    */
-  public async issueShellCommand(command: CommandBase): Promise<void> {
+  public async issueShellCommand(command: CommandBase): Promise<boolean> {
+    if (this.autoCheckConnected) this._connected = await this.checkConnected();
+    if (!this._connected) return false;
+
     this._running = true;
     this._eventEmmiter.emit("command_start", command);
     await delay(command.preDelay);
@@ -99,20 +139,22 @@ export class Device {
     });
 
     await delay(command.postDelay);
-
     this._eventEmmiter.emit("command_finish", command);
-
     this._running = false;
+
+    return true;
   }
 
   /**
    * Issue specified commands
    * @param commands
    */
-  public async issueShellCommands(commands: CommandBase[]): Promise<void> {
+  public async issueShellCommands(commands: CommandBase[]) {
     for (const command of commands) {
-      await this.issueShellCommand(command);
+      const status = await this.issueShellCommand(command);
+      if (!status) return false;
     }
+    return true;
   }
 
   /**
@@ -143,6 +185,39 @@ export class Device {
     return { x: Number(width.trim()), y: Number(height.trim()) };
   }
 
+  public async getAllPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  public async getSystemPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages -s");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  public async getThirdPartyPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages -3");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  private parsePackages(content: string): string[] {
+    const lines = content.split("\r\n");
+    const packages: string[] = [];
+    for (const l of lines) {
+      if (l === "") continue;
+      packages.push(l.split(":")[1]);
+    }
+    return packages;
+  }
+
+  public async existPackage(packageName: string) {
+    const packages = await this.getAllPackages();
+    return packages.includes(packageName);
+  }
+
   /**
    * Check if activity is running top
    * @param activityName
@@ -164,41 +239,11 @@ export class Device {
 
   /**
    * Start an app if not at the current focus
-   * @param pakageName
+   * @param packageName
    * @param activityName
    */
-  public async startApp(pakageName: string, activityName: string, timeout = 10000) {
-    const status = await this.isCurrentActivity(pakageName, activityName);
-    if (status) {
-      return true;
-    } else {
-      await this.issueShellCommandText(`am start -n ${pakageName}/${activityName}`);
-      return new Promise<boolean>(async (resolve) => {
-        let retry = 0;
-        const interval = setInterval(async () => {
-          if (retry * 1000 >= timeout) {
-            clearInterval(interval);
-            resolve(false);
-          } else {
-            const status = await this.isCurrentActivity(`${pakageName}/${activityName}`);
-            if (status) {
-              clearInterval(interval);
-              resolve(true);
-            } else {
-              retry++;
-            }
-          }
-        });
-      });
-    }
-  }
-
-  /**
-   * Close an app
-   * @param pakageName
-   */
-  public async closeApp(pakageName: string, timeout = 10000) {
-    await this.issueShellCommandText(`am force-stop ${pakageName}`);
+  public async startApp(packageName: string, activityName: string, timeout = 10000) {
+    await this.issueShellCommandText(`am start -n ${packageName}/${activityName}`);
     return new Promise<boolean>(async (resolve) => {
       let retry = 0;
       const interval = setInterval(async () => {
@@ -206,7 +251,32 @@ export class Device {
           clearInterval(interval);
           resolve(false);
         } else {
-          const status = await this.isCurrentActivity(pakageName);
+          const status = await this.isCurrentActivity(`${packageName}/${activityName}`);
+          if (status) {
+            clearInterval(interval);
+            resolve(true);
+          } else {
+            retry++;
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Close an app
+   * @param packageName
+   */
+  public async closeApp(packageName: string, timeout = 10000) {
+    await this.issueShellCommandText(`am force-stop ${packageName}`);
+    return new Promise<boolean>(async (resolve) => {
+      let retry = 0;
+      const interval = setInterval(async () => {
+        if (retry * 1000 >= timeout) {
+          clearInterval(interval);
+          resolve(false);
+        } else {
+          const status = await this.isCurrentActivity(packageName);
           if (status) {
             retry++;
           } else {
