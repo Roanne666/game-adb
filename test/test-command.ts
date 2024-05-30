@@ -1,4 +1,4 @@
-import { createAdb, TapCommand, Device } from "../src";
+import { TapCommand, Device, Adb } from "../src";
 
 const enterFirstAd = new TapCommand({
   rect: { x: 789, y: 225, width: 212, height: 75 },
@@ -34,9 +34,11 @@ async function runCommands(device: Device) {
 }
 
 (async () => {
-  const adb = await createAdb(process.argv[2]);
+  const adb = new Adb(process.argv[2]);
 
-  const device = adb.devices.find((d) => d.serialNumber === "emulator-5554");
+  const devices = await adb.getDevices();
+
+  const device = devices.find((d) => d.serialNumber === "emulator-5554");
 
   if (device) {
     device.on("command_finish", (command) => {
