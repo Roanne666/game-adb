@@ -39,6 +39,6 @@ export function getRandomPosition(rect: Rect2): Vector2 {
   return { x: targetX, y: targetY };
 }
 
-export async function delay(time: number) {
-  await new Promise((resolve) => setTimeout(() => resolve(true), time));
+export async function delay(ms: number) {
+  await new Promise((resolve) => setTimeout(() => resolve(true), ms));
 }
