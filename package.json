@@ -1,6 +1,6 @@
 {
   "name": "game-adb",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "./lib/",
   "scripts": {
     "build": "tsc",
