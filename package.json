@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "test-command": "ts-node ./test/test-command.ts",
-    "test-utils": "ts-node ./test/test-utils.ts"
+    "test-utils": "ts-node ./test/test-utils.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "adb",
