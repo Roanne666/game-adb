@@ -1,6 +1,23 @@
-import type { CommandBase } from "./command";
-import type { Vector2 } from "./types";
-import { delay, issueShellCommand } from "./utils";
+import { EventEmitter } from "events";
+import type { CommandBase, CommandLifeCycle } from "./command";
+import { type Vector2 } from "./types";
+import { delay, issueCommand } from "./utils";
+
+export class DeviceEmitter<K extends string, T extends object = never> {
+  private emitter = new EventEmitter();
+
+  on(eventName: K, listener: (command: CommandBase) => void): void {
+    this.emitter.on(eventName, listener);
+  }
+
+  off(eventName: K, listener: (command: CommandBase) => void): void {
+    this.emitter.off(eventName, listener);
+  }
+
+  emit(eventName: K, arg?: T): void {
+    this.emitter.emit(eventName, arg);
+  }
+}
 
 /**
  * The Device instance is binding with specific serial number of adb device.
@@ -17,18 +34,20 @@ export class Device {
    */
   public readonly serialNumber: string;
 
-  public readonly resolution: Vector2 = { x: 0, y: 0 };
+  /**
+   * Check whether device is connected before issue a command
+   */
+  public autoCheckConnected = true;
 
-  private _commandResolution: Vector2 = { x: 1280, y: 720 };
-  public get commandResolution() {
-    return this._commandResolution;
-  }
-  public set commandResolution(value: Vector2) {
-    this._commandResolution = value;
-  }
+  public deviceResolution: Vector2 = { x: 0, y: 0 };
+
+  public commandResolution: Vector2 = { x: 1280, y: 720 };
 
   private get resolutionRatio(): Vector2 {
-    return { x: this.resolution.x / this.commandResolution.x, y: this.resolution.y / this.commandResolution.y };
+    return {
+      x: this.deviceResolution.x / this.commandResolution.x,
+      y: this.deviceResolution.y / this.commandResolution.y,
+    };
   }
 
   private _connected: boolean;
@@ -39,11 +58,6 @@ export class Device {
     return this._connected;
   }
 
-  /**
-   * The command will be automatically executed after using the addCommand function if autoRun is true.
-   */
-  public autoRun = true;
-
   private _running = false;
   /**
    * Determines whether the command is running
@@ -52,23 +66,7 @@ export class Device {
     return this._running;
   }
 
-  private _commandQueue: CommandBase[] = [];
-  /**
-   * The command will be added to the commandQueue after using the addCommond function,.
-   */
-  public get commandQueue() {
-    return [...this._commandQueue];
-  }
-
-  /**
-   * Callback function for command_start trigger
-   */
-  private onCommandStart: ((command: CommandBase) => void) | null = null;
-
-  /**
-   * Callback function for command_finish trigger
-   */
-  private onCommandFinish: ((command: CommandBase) => void) | null = null;
+  private readonly _eventEmmiter = new DeviceEmitter<CommandLifeCycle, CommandBase>();
 
   constructor(adbPath: string, serialNumber: string, connectStatus: boolean) {
     this.adbPath = adbPath;
@@ -76,91 +74,105 @@ export class Device {
     this._connected = connectStatus;
   }
 
-  public async init() {
-    const resolution = await this.getResolution();
-    this.resolution.x = resolution.x;
-    this.resolution.y = resolution.y;
+  public async checkConnected(retry = 3) {
+    for (let i = 0; i < retry; i++) {
+      const devicesStdout = await issueCommand({ adbPath: this.adbPath, args: ["devices"] });
+      const deviceInfoArray = devicesStdout.trim().split("\r\n");
+      let devicesAttached = false;
+      for (const info of deviceInfoArray) {
+        if (devicesAttached) {
+          const [serialNumber, connectStatus] = info.split("\t");
+          if (serialNumber === this.serialNumber) {
+            return connectStatus === "device";
+          }
+        } else if (info === "List of devices attached") {
+          devicesAttached = true;
+        }
+      }
+
+      if (i < retry - 1) {
+        await delay(3000);
+      } else {
+        console.log("Adb get devices failed");
+      }
+    }
+
+    return false;
   }
 
   /**
    * Issue command by text
    * @param commandText
    */
-  public async issueCommandText(commandText: string) {
+  public async issueShellCommandText(commandText: string): Promise<string> {
+    if (this.autoCheckConnected) this._connected = await this.checkConnected();
+    if (!this._connected) return "";
+
     this._running = true;
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", commandText]);
+    const result = await issueCommand({
+      adbPath: this.adbPath,
+      serialNumber: this.serialNumber,
+      isShellCommand: true,
+      args: commandText.split(" "),
+    });
     this._running = false;
     return result;
   }
 
   /**
-   * Issue standard command
+   * Issue specified command
    * @param command
    */
-  public async issueCommand(command: CommandBase) {
+  public async issueShellCommand(command: CommandBase): Promise<boolean> {
+    if (this.autoCheckConnected) this._connected = await this.checkConnected();
+    if (!this._connected) return false;
+
     this._running = true;
-    if (this.onCommandStart) this.onCommandStart(command);
-
+    this._eventEmmiter.emit("command_start", command);
     await delay(command.preDelay);
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", ...command.getCommandArgs(this.resolutionRatio)]);
+
+    await issueCommand({
+      adbPath: this.adbPath,
+      serialNumber: this.serialNumber,
+      isShellCommand: true,
+      args: command.getCommandArgs(this.resolutionRatio),
+    });
+
     await delay(command.postDelay);
+    this._eventEmmiter.emit("command_finish", command);
+    this._running = false;
 
-    if (this.onCommandFinish) this.onCommandFinish(command);
-
-    if (this._commandQueue.length > 0 && this.autoRun) {
-      const nextCommand = this._commandQueue.shift() as CommandBase;
-      this.issueCommand(nextCommand);
-    } else {
-      this._running = false;
-    }
-  }
-
-  /**
-   * Add command to command queue
-   * @param command
-   */
-  public addCommand(command: CommandBase) {
-    if (this.autoRun && !this.running) {
-      this.issueCommand(command);
-    } else {
-      this._commandQueue.push(command);
-    }
-  }
-
-  /**
-   * Manually trigger the command, which only works when autoRun is false
-   * @returns command execute status
-   */
-  public async nextCommand() {
-    if (this.autoRun || this._running || this._commandQueue.length === 0) return false;
-    const nextCommand = this._commandQueue.shift() as CommandBase;
-    await this.issueCommand(nextCommand);
     return true;
   }
 
   /**
-   * Add listener for command_start or command_finish
-   * @param eventName
-   * @param handler
+   * Issue specified commands
+   * @param commands
    */
-  public on(eventName: "command_start" | "command_finish" | "command_delay_finish", handler: (command: CommandBase) => void) {
-    if (eventName === "command_start") {
-      this.onCommandStart = handler;
-    } else {
-      this.onCommandFinish = handler;
+  public async issueShellCommands(commands: CommandBase[]) {
+    for (const command of commands) {
+      const status = await this.issueShellCommand(command);
+      if (!status) return false;
     }
+    return true;
   }
 
   /**
-   * Remove Listener for command_start or command_finish
+   * Add listener to command life cycle event
    * @param eventName
+   * @param listener
    */
-  public off(eventName: "command_start" | "command_finish") {
-    if (eventName === "command_start") {
-      this.onCommandStart = null;
-    } else {
-      this.onCommandFinish = null;
-    }
+  public on(eventName: CommandLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmmiter.on(eventName, listener);
+  }
+
+  /**
+   * Remove Listener to command life cycle event
+   * @param eventName
+   * @param listener
+   */
+  public off(eventName: CommandLifeCycle, listener: (command: CommandBase) => void) {
+    this._eventEmmiter.off(eventName, listener);
   }
 
   /**
@@ -168,9 +180,42 @@ export class Device {
    * @returns
    */
   public async getResolution(): Promise<Vector2> {
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "wm", "size"]);
+    const result = await this.issueShellCommandText("wm size");
     const [width, height] = result.split(":")[1].split("x");
     return { x: Number(width.trim()), y: Number(height.trim()) };
+  }
+
+  public async getAllPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  public async getSystemPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages -s");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  public async getThirdPartyPackages(): Promise<string[]> {
+    const result = await this.issueShellCommandText("pm list packages -3");
+    const packages = this.parsePackages(result);
+    return packages;
+  }
+
+  private parsePackages(content: string): string[] {
+    const lines = content.split("\r\n");
+    const packages: string[] = [];
+    for (const l of lines) {
+      if (l === "") continue;
+      packages.push(l.split(":")[1]);
+    }
+    return packages;
+  }
+
+  public async existPackage(packageName: string) {
+    const packages = await this.getAllPackages();
+    return packages.includes(packageName);
   }
 
   /**
@@ -178,12 +223,15 @@ export class Device {
    * @param activityName
    * @returns
    */
-  public async isCurrentActivity(packageName: string, activityName: string) {
-    const result = await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "dumpsys", "window"]);
+  public async isCurrentActivity(packageName: string, activityName?: string) {
+    const result = await this.issueShellCommandText("dumpsys window");
     const resultLines = result.split("\r\n");
     for (const line of resultLines) {
-      if (line.includes("mCurrentFocus") && line.includes(`${packageName}/${activityName}`)) {
-        return true;
+      if (!line.includes("mCurrentFocus")) continue;
+      if (activityName) {
+        if (line.includes(`${packageName}/${activityName}`)) return true;
+      } else {
+        if (line.includes(packageName)) return true;
       }
     }
     return false;
@@ -191,28 +239,61 @@ export class Device {
 
   /**
    * Start an app if not at the current focus
-   * @param pakageName
+   * @param packageName
    * @param activityName
    */
-  public async startApp(pakageName: string, activityName: string) {
-    const status = await this.isCurrentActivity(pakageName, activityName);
-    if (!status) await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "start", "-n", `${pakageName}/${activityName}`]);
+  public async startApp(packageName: string, activityName: string, timeout = 10000) {
+    await this.issueShellCommandText(`am start -n ${packageName}/${activityName}`);
+    return new Promise<boolean>(async (resolve) => {
+      let retry = 0;
+      const interval = setInterval(async () => {
+        if (retry * 1000 >= timeout) {
+          clearInterval(interval);
+          resolve(false);
+        } else {
+          const status = await this.isCurrentActivity(`${packageName}/${activityName}`);
+          if (status) {
+            clearInterval(interval);
+            resolve(true);
+          } else {
+            retry++;
+          }
+        }
+      });
+    });
   }
 
   /**
    * Close an app
-   * @param pakageName
+   * @param packageName
    */
-  public async closeApp(pakageName: string) {
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "am", "force-stop", pakageName]);
+  public async closeApp(packageName: string, timeout = 10000) {
+    await this.issueShellCommandText(`am force-stop ${packageName}`);
+    return new Promise<boolean>(async (resolve) => {
+      let retry = 0;
+      const interval = setInterval(async () => {
+        if (retry * 1000 >= timeout) {
+          clearInterval(interval);
+          resolve(false);
+        } else {
+          const status = await this.isCurrentActivity(packageName);
+          if (status) {
+            retry++;
+          } else {
+            clearInterval(interval);
+            resolve(true);
+          }
+        }
+      });
+    });
   }
 
   /**
    * Take a screencap and pull it out
-   * @param options 
+   * @param options
    */
   public async getScreencap(options?: { fileName?: string; pullPath?: string }) {
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "shell", "screencap", options?.fileName || "/sdcard/screen.png"]);
-    await issueShellCommand(this.adbPath, ["-s", this.serialNumber, "pull", options?.fileName || "/sdcard/screen.png", options?.pullPath || "./"]);
+    await this.issueShellCommandText(`screencap ${options?.fileName || "/sdcard/screen.png"}`);
+    await this.issueShellCommandText(`pull ${options?.fileName || "/sdcard/screen.png"} ${options?.pullPath || "./"}`);
   }
 }

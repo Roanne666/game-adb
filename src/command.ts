@@ -1,5 +1,12 @@
-import type { CommandOptions, Rect2, Vector2 } from "./types";
+import type { Rect2, Vector2 } from "./types";
 import { getRandomPosition } from "./utils";
+
+export type CommandLifeCycle = "command_start" | "command_finish";
+
+export type CommandOptions = {
+  preDelay?: number;
+  postDelay?: number;
+};
 
 export abstract class CommandBase {
   static commandCount = 0;
@@ -13,15 +20,15 @@ export abstract class CommandBase {
     if (options?.postDelay) this.postDelay = options.postDelay;
   }
 
-  public abstract getCommandArgs(resolutionRatio?: Vector2): string[];
+  public abstract getCommandArgs(resolutionRatio: Vector2): string[];
 }
 
 export class TapCommand extends CommandBase {
   public readonly targetPos: Vector2;
 
-  constructor(rect: Rect2, options?: CommandOptions) {
+  constructor(options: { rect: Rect2 } & CommandOptions) {
     super(options);
-    this.targetPos = getRandomPosition(rect);
+    this.targetPos = getRandomPosition(options.rect);
   }
 
   public getCommandArgs(resolutionRatio: Vector2) {
@@ -34,11 +41,11 @@ export class SwipeCommand extends CommandBase {
   public readonly targetPos: Vector2;
   public readonly duration: number;
 
-  constructor(originRect: Rect2, targetRect: Rect2, duration = 500, options?: CommandOptions) {
+  constructor(options: { originRect: Rect2; targetRect: Rect2; duration?: number } & CommandOptions) {
     super(options);
-    this.originPos = getRandomPosition(originRect);
-    this.targetPos = getRandomPosition(targetRect);
-    this.duration = duration;
+    this.originPos = getRandomPosition(options.originRect);
+    this.targetPos = getRandomPosition(options.targetRect);
+    this.duration = options.duration || 500;
   }
 
   public getCommandArgs(resolutionRatio: Vector2) {
@@ -57,9 +64,9 @@ export class SwipeCommand extends CommandBase {
 export class keyEventCommand extends CommandBase {
   public readonly keyCode: number;
 
-  constructor(keyCode: number, options?: CommandOptions) {
+  constructor(options: { keyCode: number } & CommandOptions) {
     super(options);
-    this.keyCode = keyCode;
+    this.keyCode = options.keyCode;
   }
 
   public getCommandArgs(): string[] {
@@ -70,9 +77,9 @@ export class keyEventCommand extends CommandBase {
 export class TextCommand extends CommandBase {
   public readonly content: string;
 
-  constructor(content: string, options?: CommandOptions) {
+  constructor(options: { content: string } & CommandOptions) {
     super(options);
-    this.content = content;
+    this.content = options.content;
   }
 
   public getCommandArgs(): string[] {

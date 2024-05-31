@@ -18,11 +18,13 @@ yarn add game-adb
 Create adb client and get device
 
 ```typescript
-import { createAdb } from "game-adb";
+import { Adb } from "game-adb";
 
 (async () => {
-  const adb = await createAdb(path/to/adb);
+  const adb = await Adb(path/to/adb);
+  const devices = await adb.getDevices()
   const device = adb.devices.find((d) => d.serialNumber === "emulator-5554");
+  
   if (device) {
     // code
   }

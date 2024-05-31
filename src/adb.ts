@@ -1,11 +1,5 @@
 import { Device } from "./device";
-import { issueShellCommand } from "./utils";
-
-export async function createAdb(adbPath: string) {
-  const adb = new Adb(adbPath);
-  await adb.initDevices();
-  return adb;
-}
+import { delay, issueCommand } from "./utils";
 
 export class Adb {
   /**
@@ -13,35 +7,31 @@ export class Adb {
    */
   public readonly path: string;
 
-  private _devices: Device[] = [];
-  /**
-   * The list of devices
-   */
-  public get devices() {
-    return [...this._devices];
-  }
-
   constructor(adbPath: string) {
     this.path = adbPath;
   }
 
-  public async initDevices(retry = 3) {
-    if (retry === 0) throw "Adb get devices failed";
-    const devicesStdout = await issueShellCommand(this.path, ["devices"]);
-    const deviceInfoArray = devicesStdout.trim().split("\r\n");
-    let regAttached = false;
-    for (const info of deviceInfoArray) {
-      if (regAttached) {
-        const [serialNumber, connectStatus] = info.split("\t");
-        const newDevice = new Device(this.path, serialNumber, connectStatus === "device" ? true : false);
-        await newDevice.init();
-        this._devices.push(newDevice);
-      } else if (info === "List of devices attached") {
-        regAttached = true;
+  public async getDevices(retry = 3) {
+    const devices: Device[] = [];
+    for (let i = 0; i < retry; i++) {
+      const devicesStdout = await issueCommand({ adbPath: this.path, args: ["devices"] });
+      const deviceInfoArray = devicesStdout.trim().split("\r\n");
+      let devicesAttached = false;
+      for (const info of deviceInfoArray) {
+        if (devicesAttached) {
+          const [serialNumber, connectStatus] = info.split("\t");
+          const newDevice = new Device(this.path, serialNumber, connectStatus === "device");
+          newDevice.deviceResolution = await newDevice.getResolution();
+          devices.push(newDevice);
+        } else if (info === "List of devices attached") {
+          devicesAttached = true;
+        }
       }
+
+      if (devices.length > 0) return devices;
+
+      if (i < retry - 1) await delay(3000);
     }
-    if (this.devices.length === 0) {
-      await this.initDevices(retry - 1);
-    }
+    return devices;
   }
 }
